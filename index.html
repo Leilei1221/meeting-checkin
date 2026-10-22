@@ -131,11 +131,17 @@ async function adminPage(){
   ME=session.user;meetingsPage();
 }
 function loginPage(){
-  $app.innerHTML=`<h1>會議簽到系統</h1><div class="card"><label>Email</label><input id="em" type="email" autocomplete="username"><label>密碼</label><input id="pw" type="password" autocomplete="current-password">
-  <div class="row" style="margin-top:12px"><button id="in" class="pri grow">登入</button><button id="up">首次註冊</button></div><p class="mut">僅限已授權的管理者 Email 可進入。</p></div>`;
+  $app.innerHTML=`<h1>會議簽到系統</h1><div class="card"><button id="gg" class="pri" style="width:100%">用 Google 登入</button>
+  <p class="mut center">或使用 Email 與密碼</p>
+  <label>Email</label><input id="em" type="email" autocomplete="username" autocapitalize="none" autocorrect="off"><label>密碼</label><input id="pw" type="password" autocomplete="current-password">
+  <p id="msg" class="err" role="alert"></p>
+  <div class="row" style="margin-top:12px"><button id="in" class="grow">登入</button><button id="up">首次註冊</button></div><p class="mut">僅限已授權的管理者 Email 可進入。</p></div>`;
+  const msg=t=>{document.getElementById('msg').textContent=t};
   const cred=()=>({email:document.getElementById('em').value.trim().toLowerCase(),password:document.getElementById('pw').value});
-  document.getElementById('in').onclick=async()=>{const {error}=await sb.auth.signInWithPassword(cred());if(error)return toast('登入失敗：'+error.message);adminPage()};
-  document.getElementById('up').onclick=async()=>{const {data,error}=await sb.auth.signUp(cred());if(error)return toast('註冊失敗：'+error.message);toast(data.session?'註冊完成':'請到信箱點驗證信後再登入');if(data.session)adminPage()};
+  const GOOGLE_HINT='；若此帳號是用 Google 建立，請改用上方「用 Google 登入」';
+  document.getElementById('gg').onclick=async()=>{msg('');const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});if(error)msg('Google 登入失敗：'+error.message)};
+  document.getElementById('in').onclick=async()=>{msg('');const {error}=await sb.auth.signInWithPassword(cred());if(error)return msg(error.code==='invalid_credentials'?'帳號或密碼不正確'+GOOGLE_HINT:'登入失敗：'+error.message);adminPage()};
+  document.getElementById('up').onclick=async()=>{msg('');const {data,error}=await sb.auth.signUp(cred());if(error)return msg(error.code==='user_already_exists'?'此 Email 已有帳號，請改用上方「用 Google 登入」':'註冊失敗：'+error.message);if(data.session)return adminPage();msg('請到信箱點驗證信後再登入')};
 }
 async function meetingsPage(){
   const {data:ms,error}=await sb.from('mt_meetings').select('*').order('meeting_date',{ascending:false}).order('created_at',{ascending:false});
