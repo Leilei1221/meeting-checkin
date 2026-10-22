@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="會議簽到">
+<meta name="theme-color" content="#1f6feb">
+<link rel="manifest" href="manifest.json">
+<title>會議簽到系統</title>
+<style>
+:root{--bg:#f5f7fa;--card:#fff;--tx:#1b1f24;--mut:#667085;--pri:#1f6feb;--ok:#1a7f37;--bad:#cf222e;--bd:#d0d7de}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1318;--card:#1a2028;--tx:#e8edf2;--mut:#9aa7b4;--bd:#323b46}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:17px/1.5 -apple-system,"PingFang TC","Noto Sans TC",sans-serif}
+main{max-width:980px;margin:0 auto;padding:16px}
+h1{font-size:1.5rem;margin:.2em 0 .6em}h2{font-size:1.2rem;margin:1em 0 .5em}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin:12px 0}
+button,input,textarea{font:inherit;color:inherit}
+button{min-height:48px;padding:0 18px;border-radius:12px;border:1px solid var(--bd);background:var(--card);cursor:pointer}
+button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+button.bad{color:var(--bad)}
+button:disabled{opacity:.45;cursor:default}
+input,textarea{width:100%;min-height:48px;padding:10px 12px;border-radius:12px;border:1px solid var(--bd);background:var(--card)}
+textarea{min-height:110px}
+label{display:block;margin:10px 0 4px;color:var(--mut);font-size:.9rem}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:0 0 auto}.row>.grow{flex:1 1 200px}
+.tabs button{border-radius:999px}.tabs button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:middle}
+.sig{height:44px;background:#fff;border:1px solid var(--bd);border-radius:6px}
+.mut{color:var(--mut)}.ok{color:var(--ok)}.err{color:var(--bad)}
+.names{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.names button{min-height:64px;font-size:1.1rem;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.names small{color:var(--mut)}
+.names button.done{opacity:.4}
+#pad{width:100%;max-width:640px;height:260px;background:#fff;border:2px dashed var(--bd);border-radius:12px;touch-action:none;display:block}
+.center{text-align:center}
+.qr{display:inline-block;background:#fff;padding:14px;border-radius:12px}
+.big{font-size:1.8rem;font-weight:700}
+.hidden{display:none!important}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:12px 20px;border-radius:12px;z-index:9}
+.action-row{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin:6px 0}
+@media (max-width:640px){.action-row{grid-template-columns:1fr}}
+#printArea{display:none}
+@media print{body>*{display:none!important}#printArea{display:block!important;color:#000;background:#fff}
+#printArea table td,#printArea table th{border:1px solid #888}#printArea img{height:40px}}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<div id="printArea"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+const SUPABASE_URL='https://fcstpyiggvhduaztwlrf.supabase.co';
+const SUPABASE_KEY='sb_publishable_6Xo2ujpvxUS3fblNYpw7iA_2No_Ja34';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $app=document.getElementById('app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=t=>new Date(t).toLocaleString('zh-TW',{hour12:false});
+function toast(m){let e=document.getElementById('toast');if(!e){e=document.createElement('div');e.id='toast';document.body.appendChild(e)}e.textContent=m;e.hidden=false;clearTimeout(e._t);e._t=setTimeout(()=>e.hidden=true,2600)}
+const ERR={invalid_token:'簽到連結無效',meeting_closed:'此會議已關閉簽到',invalid_signature:'簽名無效，請重新簽名',attendee_not_found:'找不到此人員',invalid_name:'姓名格式不正確',already_checked_in:'此人已經簽到過了'};
+const errMsg=e=>{const m=(e&&e.message)||'';for(const k in ERR)if(m.includes(k))return ERR[k];return '發生錯誤：'+m};
+const checkinURL=t=>location.origin+location.pathname+'?t='+t;
+
+/* ============ 簽到頁（與會者／iPad 櫃檯） ============ */
+async function checkinPage(token){
+  $app.innerHTML='<p class="center mut">載入中…</p>';
+  let meeting,pick=null,walkin=false,q='';
+  const load=async()=>{
+    const {data,error}=await sb.rpc('mt_get_meeting',{p_token:token});
+    if(error||!data){$app.innerHTML='<div class="card center err">簽到連結無效或已失效</div>';return false}
+    meeting=data;return true;
+  };
+  if(!await load())return;
+  const list=()=>{
+    $app.innerHTML=`<h1 class="center">${esc(meeting.title)}</h1>
+    <p class="center mut">${esc(meeting.meeting_date)} ${esc(meeting.location||'')}</p>
+    ${meeting.status!=='open'?'<div class="card center err">此會議已關閉簽到</div>':`
+    <div class="card"><div class="row"><input class="grow" id="q" placeholder="搜尋姓名或單位" value="${esc(q)}"><button id="wk">＋ 臨時加入</button></div></div>
+    <div class="names" id="names"></div>`}`;
+    if(meeting.status!=='open')return;
+    const draw=()=>{
+      const k=q.trim().toLowerCase();
+      const rows=meeting.attendees.filter(a=>!k||a.name.toLowerCase().includes(k)||(a.department||'').toLowerCase().includes(k));
+      document.getElementById('names').innerHTML=rows.map(a=>`<button data-id="${esc(a.id)}" class="${a.checked_in?'done':''}" ${a.checked_in?'disabled':''}>${esc(a.name)}<small>${a.checked_in?'已簽到':esc(a.department||'')}</small></button>`).join('')||'<p class="mut">沒有符合的人員，請按「臨時加入」</p>';
+      document.querySelectorAll('#names button').forEach(b=>b.onclick=()=>{pick=meeting.attendees.find(a=>a.id===b.dataset.id);walkin=false;sign()});
+    };
+    const qi=document.getElementById('q');qi.oninput=()=>{q=qi.value;draw()};draw();
+    document.getElementById('wk').onclick=()=>{pick=null;walkin=true;sign()};
+  };
+  const sign=()=>{
+    $app.innerHTML=`<h1 class="center">${esc(meeting.title)}</h1><div class="card">
+    ${walkin?`<label>姓名（必填）</label><input id="wn" maxlength="50"><label>單位（選填）</label><input id="wd" maxlength="50">`:`<p class="big center">${esc(pick.name)}</p><p class="center mut">${esc(pick.department||'')}</p>`}
+    <label>請在下方簽名</label><canvas id="pad"></canvas>
+    <div class="row" style="margin-top:12px"><button id="clr">清除重寫</button><button id="bk">返回</button><button id="ok" class="pri grow">確認簽到</button></div></div>`;
+    const cv=document.getElementById('pad'),r=window.devicePixelRatio||1,W=cv.clientWidth,H=cv.clientHeight;
+    cv.width=W*Math.min(r,2);cv.height=H*Math.min(r,2);
+    const c=cv.getContext('2d');const sc=cv.width/W;c.scale(sc,sc);c.lineWidth=3;c.lineCap='round';c.lineJoin='round';c.strokeStyle='#000';
+    let drawing=false,len=0,last=null;
+    const pos=e=>{const b=cv.getBoundingClientRect();return [e.clientX-b.left,e.clientY-b.top]};
+    cv.onpointerdown=e=>{e.preventDefault();cv.setPointerCapture(e.pointerId);drawing=true;last=pos(e);c.beginPath();c.moveTo(...last);c.lineTo(last[0]+.01,last[1]);c.stroke()};
+    cv.onpointermove=e=>{if(!drawing)return;e.preventDefault();const p=pos(e);len+=Math.hypot(p[0]-last[0],p[1]-last[1]);c.lineWidth=e.pointerType==='pen'?1.5+e.pressure*3:3;c.beginPath();c.moveTo(...last);c.lineTo(...p);c.stroke();last=p};
+    cv.onpointerup=cv.onpointercancel=()=>{drawing=false};
+    document.getElementById('clr').onclick=()=>{c.clearRect(0,0,W,H);len=0};
+    document.getElementById('bk').onclick=list;
+    document.getElementById('ok').onclick=async ev=>{
+      const btn=ev.target;
+      const nm=walkin?document.getElementById('wn').value.trim():null;
+      if(walkin&&!nm)return toast('請輸入姓名');
+      if(len<30)return toast('請先簽名');
+      // 輸出時墊白底
+      const o=document.createElement('canvas');o.width=cv.width;o.height=cv.height;const oc=o.getContext('2d');oc.fillStyle='#fff';oc.fillRect(0,0,o.width,o.height);oc.drawImage(cv,0,0);
+      btn.disabled=true;
+      const {error}=await sb.rpc('mt_submit_checkin',{p_token:token,p_attendee_id:walkin?null:pick.id,p_walkin_name:nm,p_walkin_dept:walkin?document.getElementById('wd').value.trim():null,p_signature:o.toDataURL('image/png')});
+      if(error){btn.disabled=false;toast(errMsg(error));if(/already|closed|invalid_token/.test(error.message)){await load();list()}return}
+      $app.innerHTML=`<div class="card center"><p class="big ok">✓ 簽到成功</p><p>${esc(walkin?nm:pick.name)}，謝謝您！</p></div>`;
+      setTimeout(async()=>{await load();q='';list()},2200);
+    };
+  };
+  list();
+}
+
+/* ============ 管理端 ============ */
+let ME=null;
+async function adminPage(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)return loginPage();
+  const {data:ok}=await sb.rpc('mt_is_admin');
+  if(!ok){$app.innerHTML=`<div class="card"><h1>沒有權限</h1><p>帳號 ${esc(session.user.email)} 不在管理者名單內。</p><button id="lo">登出</button></div>`;document.getElementById('lo').onclick=async()=>{await sb.auth.signOut();adminPage()};return}
+  ME=session.user;meetingsPage();
+}
+function loginPage(){
+  $app.innerHTML=`<h1>會議簽到系統</h1><div class="card"><label>Email</label><input id="em" type="email" autocomplete="username"><label>密碼</label><input id="pw" type="password" autocomplete="current-password">
+  <div class="row" style="margin-top:12px"><button id="in" class="pri grow">登入</button><button id="up">首次註冊</button></div><p class="mut">僅限已授權的管理者 Email 可進入。</p></div>`;
+  const cred=()=>({email:document.getElementById('em').value.trim().toLowerCase(),password:document.getElementById('pw').value});
+  document.getElementById('in').onclick=async()=>{const {error}=await sb.auth.signInWithPassword(cred());if(error)return toast('登入失敗：'+error.message);adminPage()};
+  document.getElementById('up').onclick=async()=>{const {data,error}=await sb.auth.signUp(cred());if(error)return toast('註冊失敗：'+error.message);toast(data.session?'註冊完成':'請到信箱點驗證信後再登入');if(data.session)adminPage()};
+}
+async function meetingsPage(){
+  const {data:ms,error}=await sb.from('mt_meetings').select('*').order('meeting_date',{ascending:false}).order('created_at',{ascending:false});
+  if(error)return toast(errMsg(error));
+  $app.innerHTML=`<div class="row"><h1 class="grow">我的會議</h1><button id="lo">登出</button></div>
+  <div class="card"><h2>新增會議</h2><div class="row"><input class="grow" id="t" placeholder="會議名稱"><input id="d" type="date" style="width:170px" value="${new Date().toLocaleDateString('sv')}"><input class="grow" id="l" placeholder="地點（選填）"><button id="add" class="pri">建立</button></div></div>
+  ${ms.map(m=>`<div class="card row"><div class="grow"><b>${esc(m.title)}</b><br><span class="mut">${esc(m.meeting_date)} ${esc(m.location||'')} · ${m.status==='open'?'簽到中':'已關閉'}</span></div><button data-id="${m.id}">開啟</button></div>`).join('')||'<p class="mut">尚無會議</p>'}`;
+  document.getElementById('lo').onclick=async()=>{await sb.auth.signOut();adminPage()};
+  document.getElementById('add').onclick=async()=>{
+    const title=document.getElementById('t').value.trim();if(!title)return toast('請輸入會議名稱');
+    const {data,error}=await sb.from('mt_meetings').insert({title,meeting_date:document.getElementById('d').value,location:document.getElementById('l').value.trim()||null}).select().single();
+    if(error)return toast(errMsg(error));meetingPage(data.id);
+  };
+  $app.querySelectorAll('button[data-id]').forEach(b=>b.onclick=()=>meetingPage(b.dataset.id));
+}
+async function meetingPage(id,tab='checkin'){
+  const [{data:m},{data:att},{data:cks},{data:mn}]=await Promise.all([
+    sb.from('mt_meetings').select('*').eq('id',id).single(),
+    sb.from('mt_attendees').select('*').eq('meeting_id',id).order('name'),
+    sb.from('mt_checkins').select('*').eq('meeting_id',id).order('checked_in_at'),
+    sb.from('mt_minutes').select('*').eq('meeting_id',id).maybeSingle()]);
+  if(!m)return meetingsPage();
+  const ckBy=Object.fromEntries(cks.map(c=>[c.attendee_id,c]));
+  const url=checkinURL(m.token);
+  $app.innerHTML=`<div class="row"><button id="back">← 返回</button><h1 class="grow">${esc(m.title)}</h1></div>
+  <p class="mut">${esc(m.meeting_date)} ${esc(m.location||'')} · 已簽到 <b>${cks.length}</b> / ${att.length} 人</p>
+  <div class="tabs row"><button data-t="checkin">簽到狀況</button><button data-t="roster">名單管理</button><button data-t="qr">QR Code／簽到頁</button><button data-t="minutes">會議紀錄</button></div>
+  <div id="pane"></div>`;
+  $app.querySelectorAll('.tabs button').forEach(b=>{b.classList.toggle('on',b.dataset.t===tab);b.onclick=()=>meetingPage(id,b.dataset.t)});
+  document.getElementById('back').onclick=meetingsPage;
+  const pane=document.getElementById('pane');
+  const reload=()=>meetingPage(id,tab);
+
+  if(tab==='checkin'){
+    pane.innerHTML=`<div class="row" style="margin:10px 0"><button id="r">重新整理</button><button id="csv">匯出 CSV</button><button id="pr">列印簽到表</button><button id="tg" class="${m.status==='open'?'bad':'pri'}">${m.status==='open'?'關閉簽到':'重新開放簽到'}</button><button id="del" class="bad">刪除會議</button></div>
+    <div class="card" style="overflow:auto"><table><tr><th>姓名</th><th>單位</th><th>簽到時間</th><th>簽名</th></tr>
+    ${att.map(a=>{const c=ckBy[a.id];return `<tr><td>${esc(a.name)}${a.is_walkin?' <span class="mut">(臨時)</span>':''}</td><td>${esc(a.department||'')}</td><td>${c?esc(fmt(c.checked_in_at)):'<span class="err">未簽到</span>'}</td><td>${c?`<img class="sig" src="${esc(c.signature)}">`:''}</td></tr>`}).join('')}</table></div>`;
+    document.getElementById('r').onclick=reload;
+    document.getElementById('csv').onclick=()=>{
+      const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+      const rows=[['姓名','單位','臨時加入','簽到狀態','簽到時間'],...att.map(a=>{const c=ckBy[a.id];return [a.name,a.department||'',a.is_walkin?'是':'否',c?'已簽到':'未簽到',c?fmt(c.checked_in_at):'']})];
+      const blob=new Blob(['﻿'+rows.map(r=>r.map(q).join(',')).join('\r\n')],{type:'text/csv'});
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`簽到表_${m.meeting_date}_${m.title}.csv`;a.click();
+    };
+    document.getElementById('pr').onclick=()=>{
+      document.getElementById('printArea').innerHTML=`<h2>${esc(m.title)} 簽到表</h2><p>${esc(m.meeting_date)} ${esc(m.location||'')}　已簽到 ${cks.length} / ${att.length}</p><table><tr><th>姓名</th><th>單位</th><th>簽到時間</th><th>簽名</th></tr>${att.map(a=>{const c=ckBy[a.id];return `<tr><td>${esc(a.name)}</td><td>${esc(a.department||'')}</td><td>${c?esc(fmt(c.checked_in_at)):'未簽到'}</td><td>${c?`<img src="${esc(c.signature)}">`:''}</td></tr>`}).join('')}</table>`;
+      window.print();
+    };
+    document.getElementById('tg').onclick=async()=>{const {error}=await sb.from('mt_meetings').update({status:m.status==='open'?'closed':'open'}).eq('id',id);if(error)return toast(errMsg(error));reload()};
+    document.getElementById('del').onclick=async()=>{if(!confirm('確定刪除此會議？名單、簽到與紀錄會一併刪除，無法復原。'))return;const {error}=await sb.from('mt_meetings').delete().eq('id',id);if(error)return toast(errMsg(error));meetingsPage()};
+  }
+
+  if(tab==='roster'){
+    pane.innerHTML=`<div class="card"><h2>批次匯入</h2><p class="mut">每行一人，格式「姓名」或「姓名,單位」（逗號、Tab 皆可，可直接從 Excel 貼上）。已存在的姓名會略過。</p><textarea id="bulk" placeholder="王小明,教務處&#10;李小華,學務處"></textarea><div class="row" style="margin-top:8px"><button id="imp" class="pri">匯入</button></div></div>
+    <div class="card"><h2>單筆新增</h2><div class="row"><input class="grow" id="n" placeholder="姓名"><input class="grow" id="dp" placeholder="單位（選填）"><button id="one" class="pri">新增</button></div></div>
+    <div class="card" style="overflow:auto"><table><tr><th>姓名</th><th>單位</th><th></th></tr>${att.map(a=>`<tr><td>${esc(a.name)}${a.is_walkin?' <span class="mut">(臨時)</span>':''}</td><td>${esc(a.department||'')}</td><td><button class="bad" data-del="${a.id}" ${ckBy[a.id]?'disabled title="已簽到不可刪除"':''}>刪除</button></td></tr>`).join('')}</table></div>`;
+    document.getElementById('imp').onclick=async()=>{
+      const have=new Set(att.map(a=>a.name));const seen=new Set();const rows=[];
+      for(const line of document.getElementById('bulk').value.split(/\r?\n/)){
+        const [n,...d]=line.split(/[,\t，]/);const name=(n||'').trim();if(!name||name.length>50||have.has(name)||seen.has(name))continue;seen.add(name);
+        rows.push({meeting_id:id,name,department:d.join(' ').trim().slice(0,50)||null});
+      }
+      if(!rows.length)return toast('沒有可匯入的新名單');
+      const {error}=await sb.from('mt_attendees').insert(rows);if(error)return toast(errMsg(error));toast(`已匯入 ${rows.length} 人`);reload();
+    };
+    document.getElementById('one').onclick=async()=>{
+      const name=document.getElementById('n').value.trim();if(!name)return toast('請輸入姓名');
+      const {error}=await sb.from('mt_attendees').insert({meeting_id:id,name,department:document.getElementById('dp').value.trim()||null});
+      if(error)return toast(error.code==='23505'?'此姓名已在名單中':errMsg(error));reload();
+    };
+    pane.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{const {error}=await sb.from('mt_attendees').delete().eq('id',b.dataset.del);if(error)return toast(errMsg(error));reload()});
+  }
+
+  if(tab==='qr'){
+    const qr=qrcode(0,'M');qr.addData(url);qr.make();
+    pane.innerHTML=`<div class="card center"><div class="qr">${qr.createSvgTag({cellSize:7,margin:0,scalable:true})}</div>
+    <p class="big">${esc(m.title)}</p><p class="mut" style="word-break:break-all">${esc(url)}</p>
+    <div class="row" style="justify-content:center"><button id="open" class="pri">在這台 iPad 開啟簽到頁（櫃檯模式）</button><button id="cp">複製連結</button></div>
+    <p class="mut">與會者掃描此 QR Code 即可簽到；或把 iPad 放在櫃檯，開啟簽到頁讓大家依序簽名。請勿公開此連結。</p></div>`;
+    document.getElementById('open').onclick=()=>window.open(url,'_blank');
+    document.getElementById('cp').onclick=()=>navigator.clipboard.writeText(url).then(()=>toast('已複製'),()=>toast('複製失敗，請手動選取'));
+  }
+
+  if(tab==='minutes'){
+    let items=Array.isArray(mn?.action_items)?mn.action_items:[];
+    const drawItems=()=>{document.getElementById('items').innerHTML=items.map((it,i)=>`<div class="action-row"><input data-k="task" data-i="${i}" placeholder="待辦事項" value="${esc(it.task)}"><input data-k="owner" data-i="${i}" placeholder="負責人" value="${esc(it.owner)}"><input data-k="due" data-i="${i}" type="date" value="${esc(it.due)}"><button data-rm="${i}" class="bad">刪</button></div>`).join('');
+      document.querySelectorAll('#items input').forEach(x=>x.oninput=()=>{items[x.dataset.i][x.dataset.k]=x.value});
+      document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{items.splice(+b.dataset.rm,1);drawItems()})};
+    pane.innerHTML=`<div class="card"><label>議題</label><textarea id="ag">${esc(mn?.agenda||'')}</textarea><label>決議事項</label><textarea id="dc">${esc(mn?.decisions||'')}</textarea>
+    <label>待辦追蹤</label><div id="items"></div><button id="ai">＋ 新增待辦</button>
+    <div class="row" style="margin-top:14px"><button id="sv" class="pri">儲存紀錄</button><button id="pm">列印／存成 PDF</button></div></div>`;
+    drawItems();
+    document.getElementById('ai').onclick=()=>{items.push({task:'',owner:'',due:''});drawItems()};
+    const body=()=>({meeting_id:id,agenda:document.getElementById('ag').value,decisions:document.getElementById('dc').value,action_items:items.filter(i=>i.task.trim()),updated_at:new Date().toISOString()});
+    document.getElementById('sv').onclick=async()=>{const {error}=await sb.from('mt_minutes').upsert(body());if(error)return toast(errMsg(error));toast('已儲存')};
+    document.getElementById('pm').onclick=()=>{
+      const b=body();const attended=att.filter(a=>ckBy[a.id]).map(a=>a.name);const absent=att.filter(a=>!ckBy[a.id]).map(a=>a.name);
+      const nl=s=>esc(s).replace(/\n/g,'<br>');
+      document.getElementById('printArea').innerHTML=`<h2>${esc(m.title)} 會議紀錄</h2><p>日期：${esc(m.meeting_date)}　地點：${esc(m.location||'')}</p>
+      <p>出席（${attended.length}）：${esc(attended.join('、'))}<br>未出席（${absent.length}）：${esc(absent.join('、')||'無')}</p>
+      <h3>議題</h3><p>${nl(b.agenda)}</p><h3>決議事項</h3><p>${nl(b.decisions)}</p>
+      <h3>待辦追蹤</h3><table><tr><th>事項</th><th>負責人</th><th>期限</th></tr>${b.action_items.map(i=>`<tr><td>${esc(i.task)}</td><td>${esc(i.owner)}</td><td>${esc(i.due)}</td></tr>`).join('')}</table>`;
+      window.print();
+    };
+  }
+}
+
+/* ============ 啟動 ============ */
+const T=new URLSearchParams(location.search).get('t');
+if('serviceWorker' in navigator){/* 不註冊 SW：簽到需即時連線，避免快取舊版 */}
+T?checkinPage(T):adminPage();
+</script>
+</body>
+</html>

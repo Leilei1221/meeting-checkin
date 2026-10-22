@@ -1,0 +1,9 @@
+{
+  "name": "會議簽到系統",
+  "short_name": "會議簽到",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#1f6feb",
+  "lang": "zh-Hant"
+}
