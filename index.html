@@ -219,8 +219,8 @@ async function meetingPage(id,tab='checkin'){
     const qr=qrcode(0,'M');qr.addData(url);qr.make();
     pane.innerHTML=`<div class="card center"><div class="qr">${qr.createSvgTag({cellSize:7,margin:0,scalable:true})}</div>
     <p class="big">${esc(m.title)}</p><p class="mut" style="word-break:break-all">${esc(url)}</p>
-    <div class="row" style="justify-content:center"><button id="open" class="pri">在這台 iPad 開啟簽到頁（櫃檯模式）</button><button id="cp">複製連結</button></div>
-    <p class="mut">與會者掃描此 QR Code 即可簽到；或把 iPad 放在櫃檯，開啟簽到頁讓大家依序簽名。請勿公開此連結。</p></div>`;
+    <div class="row" style="justify-content:center"><button id="open" class="pri">在這台裝置開啟簽到頁（櫃檯模式）</button><button id="cp">複製連結</button></div>
+    <p class="mut">與會者掃描此 QR Code 即可簽到；或把平板放在櫃檯，開啟簽到頁讓大家依序簽名。請勿公開此連結。</p></div>`;
     document.getElementById('open').onclick=()=>window.open(url,'_blank');
     document.getElementById('cp').onclick=()=>navigator.clipboard.writeText(url).then(()=>toast('已複製'),()=>toast('複製失敗，請手動選取'));
   }
