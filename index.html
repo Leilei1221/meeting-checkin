@@ -18,7 +18,7 @@ main{max-width:980px;margin:0 auto;padding:18px 16px calc(32px + env(safe-area-i
 h1{font-size:1.6rem;line-height:1.3;margin:.2em 0 .5em}h2{font-size:1.2rem;margin:.2em 0 .6em}
 .hd{display:flex;align-items:center;gap:12px;margin-bottom:6px}.hd h1{margin:0}
 .hd.center{justify-content:center;flex-direction:column;gap:6px;text-align:center}
-.ic{display:block;flex:none}
+.ic{display:block;flex:none}.center>.ic{margin-inline:auto}
 .card{background:#fff;border:2.5px solid var(--ink);border-radius:24px;padding:16px;margin:14px 0;box-shadow:4px 5px 0 var(--ink)}
 button,input,textarea{font:inherit;color:inherit}
 button{position:relative;min-height:48px;padding:0 18px;border-radius:999px;border:2px solid var(--ink);background:#fff;box-shadow:2px 3px 0 var(--ink);cursor:pointer;font-weight:700;color:var(--ink);transition:transform .08s}
@@ -80,11 +80,14 @@ function toast(m){let e=document.getElementById('toast');if(!e){e=document.creat
 const ERR={invalid_token:'簽到連結無效',meeting_closed:'此會議已關閉簽到',invalid_signature:'簽名無效，請重新簽名',attendee_not_found:'找不到此人員',invalid_name:'姓名格式不正確',already_checked_in:'此人已經簽到過了'};
 const errMsg=e=>{const m=(e&&e.message)||'';for(const k in ERR)if(m.includes(k))return ERR[k];return '發生錯誤：'+m};
 const ink='#3A3535';
+const CAT=(fill,face,extra='')=>`<svg class="ic" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#3A3535" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${extra}<path d="M10 25 L8.5 8.5 Q8.5 6.5 10.5 7.5 L21.5 14 Q28 12.5 34.5 14 L45.5 7.5 Q47.5 6.5 47.5 8.5 L46 25 Q50.5 31 48.5 39 Q44.5 50 28 50 Q11.5 50 7.5 39 Q5.5 31 10 25Z" fill="${fill}"/><path d="M12 12.5L18.5 16 12.5 21z" fill="#F4B5AE" stroke="none"/><path d="M44 12.5L37.5 16 43.5 21z" fill="#F4B5AE" stroke="none"/>${face}<path d="M26.5 36h3L28 38z" fill="#3A3535" stroke-width="1.5"/><path d="M24.5 40q3.5 3 3.5 0 0 3 3.5 0" stroke-width="2"/><circle cx="15" cy="38" r="3" fill="#F4B5AE" stroke="none"/><circle cx="41" cy="38" r="3" fill="#F4B5AE" stroke="none"/></svg>`;
+const DOTS='<circle cx="20.5" cy="32" r="1.9" fill="#3A3535" stroke="none"/><circle cx="35.5" cy="32" r="1.9" fill="#3A3535" stroke="none"/>';
+const HAPPY='<path d="M17.5 33q3-4 6 0M32.5 33q3-4 6 0"/>';
 const IC={
-  clip:'<svg class="ic" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#3A3535" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="11" y="9" width="34" height="40" rx="7" fill="#A9D6EE"/><rect x="20" y="4" width="16" height="10" rx="3.5" fill="#F8D768"/><circle cx="22" cy="28" r="1.6" fill="#3A3535"/><circle cx="34" cy="28" r="1.6" fill="#3A3535"/><path d="M23 35q5 5 10 0"/><path d="M18 43h8" opacity=".5"/></svg>',
-  pen:'<svg class="ic" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#3A3535" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M38 8l10 10-26 26-13 3 3-13z" fill="#F8D768"/><path d="M33 13l10 10"/><path d="M9 47l3-13 10 10z" fill="#F9C79B"/><path d="M28 50q5-4 9 0t9-2" opacity=".6"/></svg>',
-  ok:'<svg class="ic" width="72" height="72" viewBox="0 0 56 56" fill="none" stroke="#3A3535" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="28" cy="28" r="22" fill="#fff"/><path d="M17 29l8 8 14-16" stroke-width="4"/></svg>',
-  lock:'<svg class="ic" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#3A3535" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 24v-6a10 10 0 0120 0v6"/><rect x="12" y="24" width="32" height="24" rx="7" fill="#CFC1EA"/><circle cx="23" cy="35" r="1.6" fill="#3A3535"/><circle cx="33" cy="35" r="1.6" fill="#3A3535"/><path d="M24 41q4 3 8 0"/></svg>'
+  clip:CAT('#fff',DOTS+'<circle cx="20.5" cy="32" r="6" stroke-width="1.8"/><circle cx="35.5" cy="32" r="6" stroke-width="1.8"/><path d="M26.5 31.5h3" stroke-width="1.8"/>'),
+  pen:CAT('#fff',HAPPY,'<path d="M40 52l8-13 4 3-9 12z" fill="#F8D768" stroke-width="2"/>').replace('width="56" height="56"','width="64" height="64"'),
+  ok:CAT('#fff',HAPPY).replace('width="56" height="56"','width="80" height="80"'),
+  lock:CAT('#CFC9C4','<path d="M17.5 32q3 3 6 0M32.5 32q3 3 6 0"/><path d="M44 12h5l-5 6h5" stroke-width="2"/>')
 };
 const checkinURL=t=>location.origin+location.pathname+'?t='+t;
 
@@ -101,7 +104,7 @@ async function checkinPage(token){
   const list=()=>{
     $app.innerHTML=`<div class="hd center">${IC.clip}<h1>${esc(meeting.title)}</h1></div>
     <p class="center mut">${esc(meeting.meeting_date)} ${esc(meeting.location||'')}</p>
-    ${meeting.status!=='open'?'<div class="card center err notice">此會議已關閉簽到</div>':`
+    ${meeting.status!=='open'?`<div class="card center err notice">${IC.lock}<p>此會議已關閉簽到</p></div>`:`
     <div class="card"><div class="row"><input class="grow" id="q" placeholder="搜尋姓名或單位" value="${esc(q)}"><button id="wk" class="pri">＋ 臨時加入</button></div></div>
     <div class="names" id="names"></div>`}`;
     if(meeting.status!=='open')return;
