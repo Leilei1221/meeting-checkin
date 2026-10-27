@@ -5,45 +5,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="會議簽到">
-<meta name="theme-color" content="#1f6feb">
+<meta name="theme-color" content="#FDF8EC">
 <link rel="manifest" href="manifest.json">
 <title>會議簽到系統</title>
 <style>
-:root{--bg:#f5f7fa;--card:#fff;--tx:#1b1f24;--mut:#667085;--pri:#1f6feb;--ok:#1a7f37;--bad:#cf222e;--bd:#d0d7de}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1318;--card:#1a2028;--tx:#e8edf2;--mut:#9aa7b4;--bd:#323b46}}
+/* 清松手寫體 1（SIL OFL 1.1，見 fonts/README.md）。約 4.3 MB，載入前先用備用字型，載入後由瀏覽器快取 */
+@font-face{font-family:'JasonHandwriting';src:url(fonts/JasonHandwriting1.woff2) format('woff2');font-weight:400;font-style:normal;font-display:swap}
+:root{color-scheme:light;--ink:#3A3535;--mut:#6B6360;--cream:#FDF8EC;--yellow:#F8D768;--green:#BFE3A8;--blue:#A9D6EE;--pink:#F4B5AE;--lav:#CFC1EA;--peach:#F9C79B;--sand:#F3EAD0;--ok:#2F5B45;--bad:#9A3834}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:17px/1.5 -apple-system,"PingFang TC","Noto Sans TC",sans-serif}
-main{max-width:980px;margin:0 auto;padding:16px}
-h1{font-size:1.5rem;margin:.2em 0 .6em}h2{font-size:1.2rem;margin:1em 0 .5em}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin:12px 0}
+body{margin:0;background:var(--cream);color:var(--ink);font:17px/1.55 'JasonHandwriting','Huninn','Noto Sans TC','PingFang TC',-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:980px;margin:0 auto;padding:18px 16px calc(32px + env(safe-area-inset-bottom))}
+h1{font-size:1.6rem;line-height:1.3;margin:.2em 0 .5em}h2{font-size:1.2rem;margin:.2em 0 .6em}
+.hd{display:flex;align-items:center;gap:12px;margin-bottom:6px}.hd h1{margin:0}
+.hd.center{justify-content:center;flex-direction:column;gap:6px;text-align:center}
+.ic{display:block;flex:none}
+.card{background:#fff;border:2.5px solid var(--ink);border-radius:24px;padding:16px;margin:14px 0;box-shadow:4px 5px 0 var(--ink)}
 button,input,textarea{font:inherit;color:inherit}
-button{min-height:48px;padding:0 18px;border-radius:12px;border:1px solid var(--bd);background:var(--card);cursor:pointer}
-button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
-button.bad{color:var(--bad)}
-button:disabled{opacity:.45;cursor:default}
-input,textarea{width:100%;min-height:48px;padding:10px 12px;border-radius:12px;border:1px solid var(--bd);background:var(--card)}
+button{position:relative;min-height:48px;padding:0 18px;border-radius:999px;border:2px solid var(--ink);background:#fff;box-shadow:2px 3px 0 var(--ink);cursor:pointer;font-weight:700;color:var(--ink);transition:transform .08s}
+button:active:not(:disabled){transform:translate(1px,2px);box-shadow:1px 1px 0 var(--ink)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+button.pri{background:var(--yellow);border-width:2.5px;box-shadow:3px 4px 0 var(--ink)}
+button.pri::after{content:'';position:absolute;inset:3px;border:1.5px dashed rgba(58,53,53,.45);border-radius:inherit;pointer-events:none}
+button.bad{color:var(--bad);background:#fff}
+button:disabled{opacity:.5;cursor:default;box-shadow:none}
+input,textarea{width:100%;min-height:48px;padding:10px 14px;border-radius:16px;border:2px solid var(--ink);background:#fff;outline:none}
+input:focus,textarea:focus{box-shadow:0 0 0 4px rgba(248,215,104,.7)}
 textarea{min-height:110px}
-label{display:block;margin:10px 0 4px;color:var(--mut);font-size:.9rem}
+label{display:block;margin:12px 0 4px;color:var(--mut);font-size:.95rem;font-weight:700}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:0 0 auto}.row>.grow{flex:1 1 200px}
-.tabs button{border-radius:999px}.tabs button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
-table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:middle}
-.sig{height:44px;background:#fff;border:1px solid var(--bd);border-radius:6px}
+.tabs{margin:12px 0 4px;gap:10px 8px}
+.tabs button{box-shadow:2px 3px 0 var(--ink)}.tabs button.on{background:var(--yellow)}
+table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1.5px solid rgba(58,53,53,.25);text-align:left;vertical-align:middle}
+td,th{white-space:nowrap}
+th{background:var(--butter,#FFF3C4);border-bottom:2px solid var(--ink);white-space:nowrap}
+.sig{height:44px;background:#fff;border:1.5px solid var(--ink);border-radius:8px}
 .mut{color:var(--mut)}.ok{color:var(--ok)}.err{color:var(--bad)}
-.names{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.names button{min-height:64px;font-size:1.1rem;display:flex;flex-direction:column;justify-content:center;align-items:center}
-.names small{color:var(--mut)}
-.names button.done{opacity:.4}
-#pad{width:100%;max-width:640px;height:260px;background:#fff;border:2px dashed var(--bd);border-radius:12px;touch-action:none;display:block}
+.names{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.names button{min-height:68px;font-size:1.15rem;display:flex;flex-direction:column;justify-content:center;align-items:center;border-radius:22px;border-width:2.5px;box-shadow:3px 4px 0 var(--ink);padding:6px 10px}
+.names button:nth-child(6n+1){background:var(--yellow)}.names button:nth-child(6n+2){background:var(--green)}.names button:nth-child(6n+3){background:var(--blue)}
+.names button:nth-child(6n+4){background:var(--pink)}.names button:nth-child(6n+5){background:var(--lav)}.names button:nth-child(6n){background:var(--peach)}
+.names small{color:var(--ink);font-size:.85rem;font-weight:400}
+.names button.done{background:var(--sand);opacity:1;box-shadow:none;border-style:dashed;color:var(--mut)}
+.names button.done small{color:var(--mut)}
+#pad{width:100%;max-width:640px;height:260px;background:#fff;border:2.5px dashed var(--ink);border-radius:22px;touch-action:none;display:block;margin:0 auto}
 .center{text-align:center}
-.qr{display:inline-block;background:#fff;padding:14px;border-radius:12px}
+.qr{display:inline-block;background:#fff;padding:14px;border:2.5px solid var(--ink);border-radius:20px;box-shadow:3px 4px 0 var(--ink)}
 .qr svg{display:block;width:300px;max-width:100%;height:auto}
 .big{font-size:1.8rem;font-weight:700}
 .hidden{display:none!important}
-#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;padding:12px 20px;border-radius:12px;z-index:9}
+.notice{background:var(--pink)!important;color:var(--ink)!important;font-weight:700}
+.done-card{background:var(--green);padding:28px 16px}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--cream);padding:12px 22px;border-radius:999px;z-index:9;max-width:90vw;text-align:center}
 .action-row{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;margin:6px 0}
 @media (max-width:640px){.action-row{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){button{transition:none}}
 #printArea{display:none}
-@media print{body>*{display:none!important}#printArea{display:block!important;color:#000;background:#fff}
+@media print{body>*{display:none!important}#printArea{display:block!important;color:#000;background:#fff;font-family:'Noto Sans TC','PingFang TC',sans-serif}
 #printArea table td,#printArea table th{border:1px solid #888}#printArea img{height:40px}}
 </style>
 </head>
@@ -62,6 +79,13 @@ const fmt=t=>new Date(t).toLocaleString('zh-TW',{hour12:false});
 function toast(m){let e=document.getElementById('toast');if(!e){e=document.createElement('div');e.id='toast';document.body.appendChild(e)}e.textContent=m;e.hidden=false;clearTimeout(e._t);e._t=setTimeout(()=>e.hidden=true,2600)}
 const ERR={invalid_token:'簽到連結無效',meeting_closed:'此會議已關閉簽到',invalid_signature:'簽名無效，請重新簽名',attendee_not_found:'找不到此人員',invalid_name:'姓名格式不正確',already_checked_in:'此人已經簽到過了'};
 const errMsg=e=>{const m=(e&&e.message)||'';for(const k in ERR)if(m.includes(k))return ERR[k];return '發生錯誤：'+m};
+const ink='#3A3535';
+const IC={
+  clip:'<svg class="ic" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#3A3535" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="11" y="9" width="34" height="40" rx="7" fill="#A9D6EE"/><rect x="20" y="4" width="16" height="10" rx="3.5" fill="#F8D768"/><circle cx="22" cy="28" r="1.6" fill="#3A3535"/><circle cx="34" cy="28" r="1.6" fill="#3A3535"/><path d="M23 35q5 5 10 0"/><path d="M18 43h8" opacity=".5"/></svg>',
+  pen:'<svg class="ic" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#3A3535" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M38 8l10 10-26 26-13 3 3-13z" fill="#F8D768"/><path d="M33 13l10 10"/><path d="M9 47l3-13 10 10z" fill="#F9C79B"/><path d="M28 50q5-4 9 0t9-2" opacity=".6"/></svg>',
+  ok:'<svg class="ic" width="72" height="72" viewBox="0 0 56 56" fill="none" stroke="#3A3535" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="28" cy="28" r="22" fill="#fff"/><path d="M17 29l8 8 14-16" stroke-width="4"/></svg>',
+  lock:'<svg class="ic" width="56" height="56" viewBox="0 0 56 56" fill="none" stroke="#3A3535" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 24v-6a10 10 0 0120 0v6"/><rect x="12" y="24" width="32" height="24" rx="7" fill="#CFC1EA"/><circle cx="23" cy="35" r="1.6" fill="#3A3535"/><circle cx="33" cy="35" r="1.6" fill="#3A3535"/><path d="M24 41q4 3 8 0"/></svg>'
+};
 const checkinURL=t=>location.origin+location.pathname+'?t='+t;
 
 /* ============ 簽到頁（與會者／iPad 櫃檯） ============ */
@@ -70,15 +94,15 @@ async function checkinPage(token){
   let meeting,pick=null,walkin=false,q='';
   const load=async()=>{
     const {data,error}=await sb.rpc('mt_get_meeting',{p_token:token});
-    if(error||!data){$app.innerHTML='<div class="card center err">簽到連結無效或已失效</div>';return false}
+    if(error||!data){$app.innerHTML=`<div class="card center err notice">${IC.lock}<p>簽到連結無效或已失效</p></div>`;return false}
     meeting=data;return true;
   };
   if(!await load())return;
   const list=()=>{
-    $app.innerHTML=`<h1 class="center">${esc(meeting.title)}</h1>
+    $app.innerHTML=`<div class="hd center">${IC.clip}<h1>${esc(meeting.title)}</h1></div>
     <p class="center mut">${esc(meeting.meeting_date)} ${esc(meeting.location||'')}</p>
-    ${meeting.status!=='open'?'<div class="card center err">此會議已關閉簽到</div>':`
-    <div class="card"><div class="row"><input class="grow" id="q" placeholder="搜尋姓名或單位" value="${esc(q)}"><button id="wk">＋ 臨時加入</button></div></div>
+    ${meeting.status!=='open'?'<div class="card center err notice">此會議已關閉簽到</div>':`
+    <div class="card"><div class="row"><input class="grow" id="q" placeholder="搜尋姓名或單位" value="${esc(q)}"><button id="wk" class="pri">＋ 臨時加入</button></div></div>
     <div class="names" id="names"></div>`}`;
     if(meeting.status!=='open')return;
     const draw=()=>{
@@ -91,7 +115,7 @@ async function checkinPage(token){
     document.getElementById('wk').onclick=()=>{pick=null;walkin=true;sign()};
   };
   const sign=()=>{
-    $app.innerHTML=`<h1 class="center">${esc(meeting.title)}</h1><div class="card">
+    $app.innerHTML=`<div class="hd center">${IC.pen}<h1>${esc(meeting.title)}</h1></div><div class="card">
     ${walkin?`<label>姓名（必填）</label><input id="wn" maxlength="50"><label>單位（選填）</label><input id="wd" maxlength="50">`:`<p class="big center">${esc(pick.name)}</p><p class="center mut">${esc(pick.department||'')}</p>`}
     <label>請在下方簽名</label><canvas id="pad"></canvas>
     <div class="row" style="margin-top:12px"><button id="clr">清除重寫</button><button id="bk">返回</button><button id="ok" class="pri grow">確認簽到</button></div></div>`;
@@ -115,7 +139,7 @@ async function checkinPage(token){
       btn.disabled=true;
       const {error}=await sb.rpc('mt_submit_checkin',{p_token:token,p_attendee_id:walkin?null:pick.id,p_walkin_name:nm,p_walkin_dept:walkin?document.getElementById('wd').value.trim():null,p_signature:o.toDataURL('image/png')});
       if(error){btn.disabled=false;toast(errMsg(error));if(/already|closed|invalid_token/.test(error.message)){await load();list()}return}
-      $app.innerHTML=`<div class="card center"><p class="big ok">✓ 簽到成功</p><p>${esc(walkin?nm:pick.name)}，謝謝您！</p></div>`;
+      $app.innerHTML=`<div class="card center done-card">${IC.ok}<p class="big">簽到成功</p><p>${esc(walkin?nm:pick.name)}，謝謝您！</p></div>`;
       setTimeout(async()=>{await load();q='';list()},2200);
     };
   };
@@ -128,11 +152,11 @@ async function adminPage(){
   const {data:{session}}=await sb.auth.getSession();
   if(!session)return loginPage();
   const {data:ok}=await sb.rpc('mt_is_admin');
-  if(!ok){$app.innerHTML=`<div class="card"><h1>沒有權限</h1><p>帳號 ${esc(session.user.email)} 不在管理者名單內。</p><button id="lo">登出</button></div>`;document.getElementById('lo').onclick=async()=>{await sb.auth.signOut();adminPage()};return}
+  if(!ok){$app.innerHTML=`<div class="card"><div class="hd">${IC.lock}<h1>沒有權限</h1></div><p>帳號 ${esc(session.user.email)} 不在管理者名單內。</p><button id="lo">登出</button></div>`;document.getElementById('lo').onclick=async()=>{await sb.auth.signOut();adminPage()};return}
   ME=session.user;meetingsPage();
 }
 function loginPage(){
-  $app.innerHTML=`<h1>會議簽到系統</h1><div class="card"><button id="gg" class="pri" style="width:100%">用 Google 登入</button>
+  $app.innerHTML=`<div class="hd">${IC.clip}<h1>會議簽到系統</h1></div><div class="card"><button id="gg" class="pri" style="width:100%">用 Google 登入</button>
   <p class="mut center">或使用 Email 與密碼</p>
   <label>Email</label><input id="em" type="email" autocomplete="username" autocapitalize="none" autocorrect="off"><label>密碼</label><input id="pw" type="password" autocomplete="current-password">
   <p id="msg" class="err" role="alert"></p>
@@ -147,7 +171,7 @@ function loginPage(){
 async function meetingsPage(){
   const {data:ms,error}=await sb.from('mt_meetings').select('*').order('meeting_date',{ascending:false}).order('created_at',{ascending:false});
   if(error)return toast(errMsg(error));
-  $app.innerHTML=`<div class="row"><h1 class="grow">我的會議</h1><button id="lo">登出</button></div>
+  $app.innerHTML=`<div class="row"><div class="hd grow">${IC.clip}<h1>我的會議</h1></div><button id="lo">登出</button></div>
   <div class="card"><h2>新增會議</h2><div class="row"><input class="grow" id="t" placeholder="會議名稱"><input id="d" type="date" style="width:170px" value="${new Date().toLocaleDateString('sv')}"><input class="grow" id="l" placeholder="地點（選填）"><button id="add" class="pri">建立</button></div></div>
   ${ms.map(m=>`<div class="card row"><div class="grow"><b>${esc(m.title)}</b><br><span class="mut">${esc(m.meeting_date)} ${esc(m.location||'')} · ${m.status==='open'?'簽到中':'已關閉'}</span></div><button data-id="${m.id}">開啟</button></div>`).join('')||'<p class="mut">尚無會議</p>'}`;
   document.getElementById('lo').onclick=async()=>{await sb.auth.signOut();adminPage()};
